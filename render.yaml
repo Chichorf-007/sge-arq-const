@@ -6,9 +6,12 @@ services:
     startCommand: npm start
     envVars:
       - key: SUPABASE_URL
-        sync: false
+        value: https://yjoksbfrnsagjtlcvvbm.supabase.co
       - key: SUPABASE_KEY
-        sync: false
+        value: sb_publishable_pzWRnR2LhYLyHK0YzehWfw_RwlFaKWB
       - key: JWT_SECRET
         value: sge_arq_const_secret_key_2026
+      - key: ADMIN_PASSWORD
+        value: SGveinte26@
+
 
