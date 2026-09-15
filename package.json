@@ -1,0 +1,13 @@
+{
+  "name": "sge-arq-const",
+  "version": "1.0.0",
+  "description": "Sistema de gestión de horas, obras y costos para SGE Arq-Const (Silvia González & Asociados)",
+  "main": "server/server.js",
+  "scripts": {
+    "build": "cd client && npm install && npm run build && cd ../server && npm install",
+    "start": "cd server && node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
