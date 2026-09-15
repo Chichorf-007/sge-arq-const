@@ -3,12 +3,8 @@ const bcrypt = require('bcryptjs');
 
 require('dotenv').config();
 
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
-
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.warn('⚠️ ADVERTENCIA: SUPABASE_URL o SUPABASE_KEY no están configuradas en las variables de entorno.');
-}
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yjoksbfrnsagjtlcvvbm.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_pzWRnR2LhYLyHK0YzehWfw_RwlFaKWB';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
