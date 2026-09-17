@@ -543,4 +543,10 @@ a {
   .currency-badge {
     color: #000 !important;
   }
+  .receipt-page {
+    page-break-after: always;
+  }
+  .receipt-page:last-child {
+    page-break-after: auto;
+  }
 }

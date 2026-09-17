@@ -374,7 +374,9 @@ export default function ProyectistaDashboard({ token, user }) {
                   >
                     <option value="">Todos los Proyectos</option>
                     {projects.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
+                      <option key={p.id} value={p.id}>
+                        {p.name}{p.current_stage ? ` — Etapa: ${p.current_stage.name}` : ' — Sin etapa asignada'}
+                      </option>
                     ))}
                   </select>
                 </div>

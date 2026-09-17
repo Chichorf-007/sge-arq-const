@@ -8,9 +8,10 @@ import NewTimesheetModal from './NewTimesheetModal';
 import EditTimesheetModal from './EditTimesheetModal';
 import NewExpenseModal from './NewExpenseModal';
 import ReceiptModal from './ReceiptModal';
+import ManageStagesModal from './ManageStagesModal';
 
 export default function AdminDashboard({ token, user }) {
-  const [activeTab, setActiveTab] = useState('settlement'); // 'settlement' | 'timesheets' | 'expenses' | 'proyectistas' | 'projects'
+  const [activeTab, setActiveTab] = useState('settlement'); // 'settlement' | 'timesheets' | 'expenses' | 'proyectistas' | 'projects' | 'payment-history'
   
   const [timesheets, setTimesheets] = useState([]);
   const [proyectistas, setProyectistas] = useState([]);
@@ -57,6 +58,13 @@ export default function AdminDashboard({ token, user }) {
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [showNewTimesheetModal, setShowNewTimesheetModal] = useState(false);
   const [showNewExpenseModal, setShowNewExpenseModal] = useState(false);
+  const [managingStagesProject, setManagingStagesProject] = useState(null);
+  const [receiptAlreadyPaid, setReceiptAlreadyPaid] = useState(false);
+
+  // Payment history tab state
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [loadingPaymentHistory, setLoadingPaymentHistory] = useState(false);
+  const [reprintingReceipt, setReprintingReceipt] = useState(false);
 
   const formatPYG = (val) => '₲ ' + (Math.round(val || 0)).toLocaleString('es-PY');
 
@@ -120,6 +128,22 @@ export default function AdminDashboard({ token, user }) {
     fetchData();
   }, [fetchData]);
 
+  const fetchPaymentHistory = useCallback(async () => {
+    setLoadingPaymentHistory(true);
+    try {
+      const res = await fetch('/api/payments', { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) setPaymentHistory(await res.json());
+    } catch (err) {
+      console.error('Error al cargar el historial de pagos:', err);
+    } finally {
+      setLoadingPaymentHistory(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (activeTab === 'payment-history') fetchPaymentHistory();
+  }, [activeTab, fetchPaymentHistory]);
+
   // Compute Weekly Saturday Settlement per Proyectista (Hours + Expenses)
   const weeklySettlements = useMemo(() => {
     if (!proyectistas.length) return [];
@@ -127,13 +151,13 @@ export default function AdminDashboard({ token, user }) {
     const weekTimesheets = timesheets.filter((t) => {
       if (settlementStart && t.work_date < settlementStart) return false;
       if (settlementEnd && t.work_date > settlementEnd) return false;
-      return true;
+      return !t.payment_id;
     });
 
     const weekExpenses = expenses.filter((e) => {
       if (settlementStart && e.expense_date < settlementStart) return false;
       if (settlementEnd && e.expense_date > settlementEnd) return false;
-      return true;
+      return !e.payment_id;
     });
 
     return proyectistas.map((p) => {
@@ -268,6 +292,56 @@ export default function AdminDashboard({ token, user }) {
     window.print();
   };
 
+  const handleReprintPayment = async (paymentSummary) => {
+    setReprintingReceipt(true);
+    try {
+      const res = await fetch(`/api/payments/${paymentSummary.id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Error al obtener el detalle del pago');
+      const { payment, timesheets: paidTimesheets, expenses: paidExpenses } = await res.json();
+
+      const proyectista = proyectistas.find((p) => String(p.id) === String(payment.user_id));
+      const rate = payment.total_hours > 0 ? (payment.total_hours_cost / payment.total_hours) : (proyectista?.rate_per_hour || 0);
+
+      const projMap = {};
+      (paidTimesheets || []).forEach((t) => {
+        const projName = projects.find((pr) => pr.id === t.project_id)?.name || 'Obra';
+        if (!projMap[t.project_id]) {
+          projMap[t.project_id] = { project_id: t.project_id, project_name: projName, hours: 0 };
+        }
+        projMap[t.project_id].hours += parseFloat(t.hours) || 0;
+      });
+
+      const expensesWithNames = (paidExpenses || []).map((e) => ({
+        ...e,
+        project_name: projects.find((pr) => pr.id === e.project_id)?.name || 'Obra'
+      }));
+
+      const reconstructed = {
+        user_id: payment.user_id,
+        user_name: payment.users?.name || proyectista?.name,
+        user_username: proyectista?.username,
+        rate_per_hour: rate,
+        total_hours: payment.total_hours,
+        total_cost: payment.total_hours_cost,
+        projects: Object.values(projMap),
+        expenses: expensesWithNames,
+        total_expenses: payment.total_expenses_amount,
+        grand_total: payment.grand_total,
+        period_start: payment.week_start,
+        period_end: payment.week_end
+      };
+
+      setReceiptAlreadyPaid(true);
+      setSelectedReceipt(reconstructed);
+    } catch (err) {
+      alert(err.message || 'Error al reimprimir el recibo');
+    } finally {
+      setReprintingReceipt(false);
+    }
+  };
+
   const filteredTimesheets = timesheets.filter((t) => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
@@ -354,6 +428,12 @@ export default function AdminDashboard({ token, user }) {
           onClick={() => setActiveTab('projects')}
         >
           🏛️ Proyectos / Obras
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'payment-history' ? 'active' : ''}`}
+          onClick={() => setActiveTab('payment-history')}
+        >
+          📜 Historial de Pagos
         </button>
       </div>
 
@@ -500,7 +580,7 @@ export default function AdminDashboard({ token, user }) {
                   </div>
 
                   <button
-                    onClick={() => setSelectedReceipt(s)}
+                    onClick={() => { setReceiptAlreadyPaid(false); setSelectedReceipt(s); }}
                     className="btn btn-primary"
                     style={{ width: '100%', fontSize: '0.85rem' }}
                     disabled={s.grand_total === 0}
@@ -769,7 +849,7 @@ export default function AdminDashboard({ token, user }) {
                   <th>Trabajos y Tareas Cargadas por Proyectistas</th>
                   <th>Total Horas</th>
                   <th>Costo Acumulado (₲)</th>
-                  <th>Estado</th>
+                  <th>Etapa Actual</th>
                   <th className="no-print">Acciones</th>
                 </tr>
               </thead>
@@ -809,18 +889,32 @@ export default function AdminDashboard({ token, user }) {
                         {formatPYG(projSummary?.cost || 0)}
                       </td>
                       <td style={{ verticalAlign: 'top' }}>
-                        <span style={{
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: 'var(--radius-full)',
-                          background: 'rgba(16, 185, 129, 0.15)',
-                          color: 'var(--accent-emerald)',
-                          fontSize: '0.75rem',
-                          fontWeight: 600
-                        }}>
-                          {proj.status === 'ACTIVE' ? 'En Ejecución' : 'Completado'}
-                        </span>
+                        {proj.current_stage ? (
+                          <span style={{
+                            padding: '0.2rem 0.6rem',
+                            borderRadius: 'var(--radius-full)',
+                            background: 'rgba(37,99,235,0.15)',
+                            color: '#2563EB',
+                            fontSize: '0.75rem',
+                            fontWeight: 600
+                          }}>
+                            {proj.current_stage.name}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            Sin etapa asignada
+                          </span>
+                        )}
                       </td>
-                      <td className="no-print" style={{ verticalAlign: 'top' }}>
+                      <td className="no-print" style={{ verticalAlign: 'top', whiteSpace: 'nowrap' }}>
+                        <button
+                          onClick={() => setManagingStagesProject(proj)}
+                          className="btn btn-secondary btn-sm"
+                          title="Gestionar etapas de esta obra"
+                          style={{ marginRight: '0.4rem' }}
+                        >
+                          Gestionar Etapas
+                        </button>
                         <button
                           onClick={() => handleDeleteProject(proj.id, proj.name)}
                           className="btn btn-danger btn-sm"
@@ -838,11 +932,79 @@ export default function AdminDashboard({ token, user }) {
         </div>
       )}
 
+      {/* TAB 5: Historial de Pagos */}
+      {activeTab === 'payment-history' && (
+        <div className="card">
+          <div className="card-title no-print">
+            <h2>📜 Historial de Pagos Registrados</h2>
+            <button
+              onClick={fetchPaymentHistory}
+              className="btn btn-secondary btn-sm"
+              title="Actualizar historial"
+            >
+              <RefreshCw size={14} className={loadingPaymentHistory ? 'spin' : ''} /> Actualizar
+            </button>
+          </div>
+
+          <div className="table-container">
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th>Proyectista</th>
+                  <th>Semana</th>
+                  <th>Monto Total (₲)</th>
+                  <th>Fecha de Pago</th>
+                  <th className="no-print">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paymentHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                      {loadingPaymentHistory ? 'Cargando historial de pagos...' : 'Todavía no hay pagos registrados.'}
+                    </td>
+                  </tr>
+                ) : (
+                  paymentHistory.map((item) => (
+                    <tr key={item.id}>
+                      <td style={{ fontWeight: 700 }}>{item.users?.name || `Usuario #${item.user_id}`}</td>
+                      <td>{item.week_start} al {item.week_end}</td>
+                      <td className="currency-badge">{formatPYG(item.grand_total)}</td>
+                      <td>{item.created_at ? new Date(item.created_at).toLocaleString('es-PY') : ''}</td>
+                      <td className="no-print">
+                        <button
+                          onClick={() => handleReprintPayment(item)}
+                          className="btn btn-secondary btn-sm"
+                          disabled={reprintingReceipt}
+                        >
+                          <FileText size={14} /> Reimprimir
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Modals */}
       {selectedReceipt && (
         <ReceiptModal
           settlement={selectedReceipt}
+          token={token}
+          alreadyPaid={receiptAlreadyPaid}
           onClose={() => setSelectedReceipt(null)}
+          onPaymentRegistered={receiptAlreadyPaid ? undefined : () => { setSelectedReceipt(null); fetchData(); }}
+        />
+      )}
+
+      {managingStagesProject && (
+        <ManageStagesModal
+          project={managingStagesProject}
+          token={token}
+          onClose={() => setManagingStagesProject(null)}
         />
       )}
 

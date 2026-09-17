@@ -8,6 +8,8 @@ const proyectistaRoutes = require('./routes/proyectistas');
 const projectRoutes = require('./routes/projects');
 const timesheetRoutes = require('./routes/timesheets');
 const expenseRoutes = require('./routes/expenses');
+const projectStagesRoutes = require('./routes/projectStages');
+const paymentsRoutes = require('./routes/payments');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,8 +23,10 @@ app.use('/img', express.static(path.join(__dirname, '../img')));
 app.use('/api/auth', authRoutes);
 app.use('/api/proyectistas', proyectistaRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/projects/:projectId/stages', projectStagesRoutes);
 app.use('/api/timesheets', timesheetRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/payments', paymentsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

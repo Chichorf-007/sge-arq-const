@@ -13,7 +13,31 @@ router.get('/', authenticateToken, async (req, res) => {
       .order('name', { ascending: true });
 
     if (error) throw error;
-    res.json(projects || []);
+
+    const projectIds = (projects || []).map((p) => p.id);
+    let currentStageByProjectId = {};
+
+    if (projectIds.length > 0) {
+      const { data: currentStages, error: stagesError } = await supabase
+        .from('project_stages')
+        .select('id, project_id, name, sequence')
+        .in('project_id', projectIds)
+        .eq('is_current', true);
+
+      if (stagesError) throw stagesError;
+
+      currentStageByProjectId = (currentStages || []).reduce((map, stage) => {
+        map[stage.project_id] = { id: stage.id, name: stage.name, sequence: stage.sequence };
+        return map;
+      }, {});
+    }
+
+    const projectsWithStage = (projects || []).map((project) => ({
+      ...project,
+      current_stage: currentStageByProjectId[project.id] || null
+    }));
+
+    res.json(projectsWithStage);
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener proyectos' });
   }

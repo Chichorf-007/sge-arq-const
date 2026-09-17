@@ -21,6 +21,7 @@ router.get('/', authenticateToken, async (req, res) => {
         created_at,
         project_id,
         user_id,
+        payment_id,
         projects ( id, name ),
         users ( id, name )
       `)
@@ -69,7 +70,8 @@ router.get('/', authenticateToken, async (req, res) => {
       project_id: row.project_id,
       project_name: row.category === 'PROJECT' ? (row.projects?.name || 'Obra') : 'Oficina General',
       user_id: row.user_id,
-      user_name: row.users?.name || 'Proyectista'
+      user_name: row.users?.name || 'Proyectista',
+      payment_id: row.payment_id
     }));
 
     res.json(sanitizedRows);
@@ -143,6 +145,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para modificar este gasto' });
     }
 
+    if (existing.payment_id !== null && existing.payment_id !== undefined) {
+      return res.status(403).json({ error: 'No se puede modificar ni eliminar un registro que ya forma parte de un pago liquidado.' });
+    }
+
     const updatePayload = {
       expense_date: expense_date || existing.expense_date,
       amount: amount ? parseFloat(amount) : existing.amount,
@@ -182,6 +188,10 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 
     if (req.user.role !== 'ADMIN' && existing.user_id !== req.user.id) {
       return res.status(403).json({ error: 'No tienes permiso para eliminar este gasto' });
+    }
+
+    if (existing.payment_id !== null && existing.payment_id !== undefined) {
+      return res.status(403).json({ error: 'No se puede modificar ni eliminar un registro que ya forma parte de un pago liquidado.' });
     }
 
     const { error } = await supabase.from('expenses').delete().eq('id', id);

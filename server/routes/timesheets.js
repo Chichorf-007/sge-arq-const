@@ -37,6 +37,7 @@ router.get('/', authenticateToken, async (req, res) => {
         created_at,
         project_id,
         user_id,
+        payment_id,
         projects ( id, name ),
         users ( id, name, rate_per_hour )
       `)
@@ -79,7 +80,8 @@ router.get('/', authenticateToken, async (req, res) => {
         project_id: row.project_id,
         project_name: row.projects?.name || 'Obra',
         user_id: row.user_id,
-        user_name: row.users?.name || 'Proyectista'
+        user_name: row.users?.name || 'Proyectista',
+        payment_id: row.payment_id
       };
 
       if (req.user.role === 'ADMIN') {
@@ -253,6 +255,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'No tienes permiso para modificar este registro' });
     }
 
+    if (existing.payment_id !== null && existing.payment_id !== undefined) {
+      return res.status(403).json({ error: 'No se puede modificar ni eliminar un registro que ya forma parte de un pago liquidado.' });
+    }
+
     const updatedStart = start_time || existing.start_time || '08:00';
     const updatedEnd = end_time || existing.end_time || '12:00';
     const updatedHours = calculateHoursBetween(updatedStart, updatedEnd);
@@ -292,6 +298,10 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 
     if (req.user.role !== 'ADMIN' && existing.user_id !== req.user.id) {
       return res.status(403).json({ error: 'No tienes permiso para eliminar este registro' });
+    }
+
+    if (existing.payment_id !== null && existing.payment_id !== undefined) {
+      return res.status(403).json({ error: 'No se puede modificar ni eliminar un registro que ya forma parte de un pago liquidado.' });
     }
 
     const { error } = await supabase.from('timesheets').delete().eq('id', id);

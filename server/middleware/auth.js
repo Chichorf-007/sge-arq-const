@@ -1,6 +1,10 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'sge_arq_const_secret_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error('Falta la variable de entorno JWT_SECRET. Configúrala antes de iniciar el servidor.');
+}
 
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];

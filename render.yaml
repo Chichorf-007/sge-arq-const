@@ -4,14 +4,18 @@ services:
     env: node
     buildCommand: npm run build
     startCommand: npm start
+    # NOTA: este servicio está creado como Web Service en Render, no como Blueprint,
+    # por lo que Render NO lee este archivo automáticamente para configurar variables.
+    # Las variables de entorno reales deben cargarse a mano en el dashboard de Render
+    # (Environment). Los valores `sync: false` de abajo son documentación para el caso
+    # de que en el futuro se migre este servicio a un Blueprint gestionado por render.yaml.
     envVars:
       - key: SUPABASE_URL
         value: https://yjoksbfrnsagjtlcvvbm.supabase.co
       - key: SUPABASE_KEY
-        value: sb_publishable_pzWRnR2LhYLyHK0YzehWfw_RwlFaKWB
+        sync: false
       - key: JWT_SECRET
-        value: sge_arq_const_secret_key_2026
+        sync: false
       - key: ADMIN_PASSWORD
-        value: SGveinte26@
-
+        sync: false
 
